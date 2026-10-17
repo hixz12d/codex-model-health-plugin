@@ -2,9 +2,13 @@
 
 为 [Codex Proxy RS](https://github.com/zyycn/codex-proxy-rs) 提供独立的账号模型体检页面：选择已有账号与计量 Key，通过原生代理和请求链路运行 **Meow / ModelTrace** 两种行为指纹检测，无需再次填写 API 地址或密钥，也不修改主项目。
 
-[下载 v0.2.1](https://github.com/R-lmmortal/codex-model-health-plugin/releases/tag/v0.2.1) · [反馈问题](https://github.com/R-lmmortal/codex-model-health-plugin/issues) · [插件使用规范](https://github.com/zyycn/codex-proxy-rs/blob/main/docs/plugins.md)
+[下载定制版 v0.2.2-hixz.1](https://github.com/hixz12d/codex-model-health-plugin/releases/tag/v0.2.2-hixz.1) · [反馈问题](https://github.com/hixz12d/codex-model-health-plugin/issues) · [插件使用规范](https://github.com/zyycn/codex-proxy-rs/blob/main/docs/plugins.md)
 
-![插件页面（模拟数据，不代表真实检测结果）](docs/screenshots/overview.png)
+本仓库为 [R-lmmortal/codex-model-health-plugin v0.2.1](https://github.com/R-lmmortal/codex-model-health-plugin/tree/v0.2.1) 的批量检测定制版，维护分支为 `hixz`；上游 `main` 保留作参考，不代表定制版代码。保留原检测引擎和非商业许可证。
+
+![Meow 批量检测（模拟数据，不代表真实检测结果）](docs/screenshots/batch-desktop.png)
+
+[ModelTrace 界面](docs/screenshots/batch-modeltrace.png) · [手机界面](docs/screenshots/batch-mobile.png)
 
 ## 来源与致谢
 
@@ -23,7 +27,7 @@
 
 | 项目 | 当前支持 |
 | --- | --- |
-| 插件 ID / 版本 | `local.model-health` / `0.2.1` |
+| 插件 ID / 版本 | `local.model-health` / `0.2.2-hixz.1` |
 | 宿主清单范围 | `>=3.19.0, <4.0.0`；实际使用验证为 3.19.0，其他版本需另验 |
 | Release 平台 | Linux x86_64，glibc 2.36+（如 Debian 12）；不适用于 ARM64、Alpine/musl 或 Windows |
 | 运行方式 | `trustedProcess`，插件以宿主系统身份运行，安装代表完整信任；不是操作系统沙箱 |
@@ -32,29 +36,30 @@
 在 **插件管理 → 安装插件 → GitHub** 中填写：
 
 ```text
-仓库：R-lmmortal/codex-model-health-plugin
-版本标签：v0.2.1（或留空查询最新稳定版）
+仓库：hixz12d/codex-model-health-plugin
+版本标签：v0.2.2-hixz.1（首次切换建议明确填写标签）
 ```
 
-选择 `local.model-health-0.2.1-x86_64-unknown-linux-gnu.tar.gz`，核对平台与摘要后安装并启用。也可从 [Releases](https://github.com/R-lmmortal/codex-model-health-plugin/releases) 下载该文件，通过“上传包”安装。请不要上传 GitHub 自动生成的 **Source code (zip/tar.gz)**，它们是源码而不是插件制品。
+选择 `local.model-health-0.2.2-hixz.1-x86_64-unknown-linux-gnu.tar.gz`，核对平台与摘要后安装并启用。也可从 [Releases](https://github.com/hixz12d/codex-model-health-plugin/releases) 下载该文件，通过“上传包”安装。请不要上传 GitHub 自动生成的 **Source code (zip/tar.gz)**，它们是源码而不是插件制品。
 
 Release 同时提供同名 `.tar.gz.sha256`；下载两个附件后可校验：
 
 ```sh
-sha256sum -c local.model-health-0.2.1-x86_64-unknown-linux-gnu.tar.gz.sha256
-# macOS：shasum -a 256 -c local.model-health-0.2.1-x86_64-unknown-linux-gnu.tar.gz.sha256
+sha256sum -c local.model-health-0.2.2-hixz.1-x86_64-unknown-linux-gnu.tar.gz.sha256
+# macOS：shasum -a 256 -c local.model-health-0.2.2-hixz.1-x86_64-unknown-linux-gnu.tar.gz.sha256
 ```
 
-保留 `local.model-health` 是为了让原先本地安装的版本继续沿用同一插件身份与历史，不是更换发布账号。仓库与发布者主页为 [R-lmmortal](https://github.com/R-lmmortal)。已有本地安装可在插件详情设置 GitHub 更新来源，或上传新版后确认切换；不要为了更新而删除原配置或私有数据。
+插件原作者为 [R-lmmortal](https://github.com/R-lmmortal)，本定制版由 [hixz12d](https://github.com/hixz12d) 分发。保留 `local.model-health` 是为了沿用现有插件身份、配置与历史，不代表变更原作者归属。已有安装在插件详情把 GitHub 来源设为本仓库，下载指定标签制品并确认切换；不要卸载重装或删除原配置与私有数据。切换前暂停检测并等待当前题完成。
 
 ## 使用
 
 1. 按上述方式安装并启用插件。
-2. 打开「账号模型体检」，选择已启用的 OpenAI 账号和已有 Key 的名称。
+2. 打开「账号模型体检」，选择已启用的 OpenAI 账号和已有 Key 的名称。检测范围可选「单个账号」或「批量账号」；批量最多选择 16 个账号，可搜索、多选或一键全选。
 3. 选择该 Key 可见的请求模型及检测方法。Meow 选择对照模型和 36 / 72 / 108 题档位；ModelTrace 使用统一候选库，固定 3 轮数字选择。切换方法保留账号、Key 和请求模型。
-4. 点击「开始检测」。宿主按所选 Key 计量；每次只执行一个请求。所选 Key 的分组/模型权限仍由主服务校验。
-5. 失败会暂停；点「继续检测」才会继续。每档最多追加 50% 重试预算。离开或隐藏页面后不再发送下一题；进行中的题目可能完成或中断，已计入的尝试不会清零。页面不承担无人值守后台任务。
-6. 从历史打开报告或续测。仅在 16 个槽位满后替换最早的已结束记录，不覆盖未结束任务。
+4. 点击「开始检测」或「开始批量检测」。批次冻结当前方法、Key、请求模型和档位，按账号逐个执行；宿主按所选 Key 计量，任意时刻只执行一个请求。ModelTrace 每个账号固定三轮，不用普通问答替代指纹检测。所选 Key 的分组/模型权限仍由主服务校验。
+5. 单账号失败会暂停；点「继续检测」才会继续。批量模式下，收到明确失败结果后保留该账号报告，跳过重试并继续后续账号；管理请求结果不确定时暂停整个批次，不自动重发。每档最多追加 50% 手动重试预算。隐藏页面或点击「当前题完成后暂停批次」后不再发送下一题，返回页面需点击「继续批次」；进行中的题目可能完成或中断，已计入的尝试不会清零。页面不承担无人值守后台任务。
+6. 「本批检测结果」按方法展示重点：Meow 同时显示目标模型匹配度、当前最高候选及候选匹配度，每个有效样本返回后更新；没有有效样本时显示「—」，未完成值标为「暂定」，并列最高候选一并列出，证据不足保留提示。ModelTrace 完成三轮有效样本并得到最终归因后，才显示结论和最高候选的库内相对概率。百分比不是模型身份认证。完整报告点击账号「详情」才展开，可随时收起；查看详情不会切换到下一个账号，已打开账号的新样本仍会更新。检测历史和结果说明默认折叠。
+7. 暂停后可「结束批次」跳过剩余账号；已创建的未完成任务保留在历史中，结束批次后可单独续测。本批队列和汇总仅保留在当前页面，刷新或离开后不恢复；历史仍沿用最近 16 条，不额外扩容。仅在槽位满后替换最早的已结束记录，不覆盖未结束任务；若已有 16 个未结束任务，需要先在历史中结束任务再新建。
 
 Meow 报告给出行为匹配、行为偏移或证据不足。ModelTrace 报告展示前 5 个候选模型及家族概率，完整 17 个候选的结果保存在任务报告中；满 3 个有效样本才给出「更接近」结论。概率是在冻结候选库内、均匀先验下的相对分布，库外模型也会归到已有候选，不代表真实身份概率。
 
@@ -109,6 +114,22 @@ pnpm --dir frontend build
 `python3 scripts/package-smoke.py /absolute/path/plugin.tar.gz --continuous --modeltrace --updates` 在离线 SDK 宿主夹具中检查安装包、两种检测、更新回调和互不干扰。另加 `--updates-live` 时仅由测试宿主访问两个公开 GitHub API（不调用真实模型），验证安装包实际解析和缓存上游提交；网络失败会让该项验收失败。
 
 离线协议验收使用固定模拟回调，不向真实模型发送请求。安装后的最终验收是用一个账号分别执行 Meow 快速档和 ModelTrace 三轮检测，核对主项目使用记录中的账号与请求 ID。安装与真实计费检测由使用者主动触发。
+
+## GitHub 自动发布
+
+`.github/workflows/release.yml` 仅在本 fork 启用，推送 `v*-hixz.*` 标签时构建 Linux x86_64 安装包。发布前同步 `plugin.json`、`backend/Cargo.toml`、`backend/Cargo.lock` 中本插件包版本、`frontend/package.json` 与 NOTICE 的版本，并准备 `release/<版本>.md`。
+
+```sh
+git switch hixz
+# 提交已验证的版本改动后，推送分支和与 plugin.json 一致的新标签
+git push origin hixz
+git tag v0.2.2-hixz.1
+git push origin v0.2.2-hixz.1
+```
+
+已发布版本不覆盖、不移动标签。工作流校验版本、运行已有前端检查、用固定 SDK 提交编译打包工具，再运行 `scripts/build-linux.sh`（包含 Rust 和离线协议验收），通过后发布带 `.tar.gz` 和 `.sha256` 的非草稿、非预发行 Release 并标为 latest。`-hixz.N` 是本 fork 的版本标识；GitHub Release 的稳定/预发行标志独立设置。手动重跑需在对应版本标签上运行，已有 Release 不覆盖。
+
+源码和截图不含真实账号凭据。发布安装包不等于生产实例已安装或真实请求已验收。
 
 ## 回退
 

@@ -38,6 +38,8 @@ async function finishTrace() {
 }
 try {
   await page.goto(`${base}?preview=1`)
+  await page.getByText('如何理解结果与项目来源',{exact:true}).click()
+  await page.locator('summary').filter({hasText:'检测历史'}).click()
   await page.getByText('Meow 4.5.4',{exact:true}).waitFor()
   await page.getByRole('button',{name:'查看 主账号 A · 固定代理 的检测报告',exact:true}).waitFor()
   await shot('light-setup')
@@ -63,6 +65,7 @@ try {
   await page.getByText('preview-request-1',{exact:true}).waitFor()
   await shot('samples')
   await page.goto(`${base}?preview=1`)
+  await page.locator('summary').filter({hasText:'检测历史'}).click()
   await configureTrace()
   await shot('modeltrace-setup')
   await page.getByRole('button',{name:'开始检测',exact:true}).click()
@@ -99,6 +102,7 @@ try {
   await shot('modeltrace-short-answer')
   await page.setViewportSize({width:1440,height:1050})
   await page.goto(`${base}?preview=1&theme=dark`)
+  await page.locator('summary').filter({hasText:'检测历史'}).click()
   await page.getByRole('button',{name:'查看 主账号 A · 固定代理 的检测报告',exact:true}).click()
   await page.waitForFunction(()=>document.querySelector('progress')?.value===36)
   await page.waitForTimeout(250)
@@ -107,6 +111,7 @@ try {
   await shot('mobile-report')
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth > innerWidth+1),false,'page must not overflow horizontally')
   await page.goto(`${base}?preview=1&scenario=empty`)
+  await page.locator('summary').filter({hasText:'检测历史'}).click()
   await page.getByText('还没有检测记录。选择账号，开始第一次检测。',{exact:true}).waitFor()
   await shot('empty')
   await page.goto(`${base}?preview=1&scenario=error`)

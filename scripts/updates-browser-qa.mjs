@@ -22,6 +22,7 @@ await page.addInitScript(() => {
 })
 async function load(query = '') {
   await page.goto(`${base}?preview=1${query}`)
+  await page.getByText('如何理解结果与项目来源',{exact:true}).click()
   await page.getByRole('button', {name:'检查 Meow 更新',exact:true}).waitFor()
   assert.equal(await page.evaluate(()=>window.__calls.filter(c=>c.path==='api/upstreams/check').length),0)
 }
@@ -113,6 +114,7 @@ try {
   await page.setContent('<iframe title="Plugin sandbox" sandbox="allow-scripts" style="border:0;width:100%;height:1000px"></iframe><textarea aria-label="粘贴验收"></textarea>')
   await page.locator('iframe').evaluate((frame, content)=>{frame.srcdoc=content},srcdoc)
   const frame = page.frameLocator('iframe')
+  await frame.getByText('如何理解结果与项目来源',{exact:true}).click()
   await frame.getByRole('button',{name:'检查 Meow 更新',exact:true}).waitFor()
   assert.equal(await frame.locator('html').evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--cp-color-primary').trim().length>0),true)
   assert.deepEqual(await frame.locator('html').evaluate(()=>window.__calls.map(c=>c.path)),['api/bootstrap','api/runs'])

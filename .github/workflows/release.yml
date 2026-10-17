@@ -1,0 +1,83 @@
+name: 发布定制插件
+
+on:
+  push:
+    tags:
+      - 'v*-hixz.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'hixz12d/codex-model-health-plugin'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: 核对版本与标签
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re, tomllib
+          from pathlib import Path
+          version = json.loads(Path('plugin.json').read_text())['version']
+          assert re.fullmatch(r'\d+\.\d+\.\d+-hixz\.\d+', version), version
+          assert tomllib.loads(Path('backend/Cargo.toml').read_text())['package']['version'] == version
+          lock = tomllib.loads(Path('backend/Cargo.lock').read_text())
+          assert next(p['version'] for p in lock['package'] if p['name'] == 'codex-model-health-plugin') == version
+          assert json.loads(Path('frontend/package.json').read_text())['version'] == version
+          assert Path(f'release/{version}.md').is_file()
+          assert os.environ['GITHUB_REF'] == f'refs/tags/v{version}', '请在版本标签上运行发布'
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'PLUGIN_VERSION={version}\n')
+          PY
+      - name: 检查页面
+        run: |
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend test
+      - name: 构建固定版本打包工具
+        shell: bash
+        run: |
+          mkdir -p .build/cli .build/cargo
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/work" -v "$PWD/.build/cargo:/cache" \
+            -e CARGO_HOME=/cache -w /work rust:1.97-slim-bookworm \
+            sh -c 'cargo install --git https://github.com/zyycn/codex-proxy-rs.git --rev fef52b3717019513108733549508377a309f129d --locked --root /work/.build/cli codex-proxy-plugin-cli'
+      - name: 构建并离线验证 Linux 安装包
+        env:
+          CPR_PLUGIN_BIN: ${{ github.workspace }}/.build/cli/bin/cpr-plugin
+        run: bash scripts/build-linux.sh
+      - name: 校验附件
+        shell: bash
+        run: |
+          cd dist
+          sha256sum -c "local.model-health-${PLUGIN_VERSION}-x86_64-unknown-linux-gnu.tar.gz.sha256"
+      - name: 发布 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "v${PLUGIN_VERSION}" \
+            "dist/local.model-health-${PLUGIN_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            "dist/local.model-health-${PLUGIN_VERSION}-x86_64-unknown-linux-gnu.tar.gz.sha256" \
+            --verify-tag --latest \
+            --title "账号模型体检 ${PLUGIN_VERSION}" \
+            --notes-file "release/${PLUGIN_VERSION}.md"

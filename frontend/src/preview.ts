@@ -39,7 +39,7 @@ export function installPreview() {
     if (input.path === 'api/runs/start') {
       const selected = methods.methods.find(m=>m.method===data.method)!
       const r=example(`1-${Date.now()}`,selected.tiers.find(t=>t.id===data.tier)!.count)
-      Object.assign(r,{created_at:Date.now(),updated_at:Date.now(),status:'ready',attempts:[],report:data.method==='modeltrace'?traceReport(0):report(0,r.plan.jobs.length)})
+      Object.assign(r,{account_id:data.account_id,account_name:data.account_id==='demo-b'?'备用账号 B':'主账号 A · 固定代理',created_at:Date.now(),updated_at:Date.now(),status:'ready',attempts:[],report:data.method==='modeltrace'?traceReport(0):report(0,r.plan.jobs.length)})
       Object.assign(r.plan,{method:data.method,engine_version:selected.engine_version,id:selected.id,hash:selected.hash,version:selected.version,tier:data.tier,claimed_model:data.claimed_model,request_model:data.request_model})
       runs.unshift(r);return respond({run:r})
     }
