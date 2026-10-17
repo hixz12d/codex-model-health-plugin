@@ -19,12 +19,15 @@ export function installPreview() {
   document.body.style.background='var(--cp-color-bg-layout)'
   document.body.style.padding='24px'
   const runs: Run[] = params.get('scenario') === 'empty' ? [] : [example('0-1')]
+  let sequence = 1
+  const accounts = [{id:'demo-a',name:'主账号 A · 固定代理',plan:'pro'},{id:'demo-b',name:'备用账号 B',plan:'plus'}]
+  if (params.get('scenario') === 'parallel') accounts.push(...['c','d','e'].map(id => ({id:`demo-${id}`,name:`测试账号 ${id.toUpperCase()}`,plan:'pro'})))
   window.codexProxyPlugin = {version:2,async request(input) {
     await new Promise(resolve => setTimeout(resolve,params.get('scenario') === 'loading' ? 12000 : 80))
     const data = input.body ? JSON.parse(input.body) : {}
     const respond=(value: unknown,status=200)=>({status,contentType:'application/json',body:new TextEncoder().encode(JSON.stringify(value)).buffer})
     if (params.get('scenario') === 'error') return respond({message:'模拟：宿主账号目录读取失败，请重试'},503)
-    if (input.path === 'api/bootstrap') return respond({catalog:methods,sources,accounts:params.get('scenario')==='empty'?[]:[{id:'demo-a',name:'主账号 A · 固定代理',plan:'pro'},{id:'demo-b',name:'备用账号 B',plan:'plus'}],keys:[{id:'demo-k',name:'模型体检专用',enabled:true}]})
+    if (input.path === 'api/bootstrap') return respond({catalog:methods,sources,accounts:params.get('scenario')==='empty'?[]:accounts,keys:[{id:'demo-k',name:'模型体检专用',enabled:true}]})
     if (input.path === 'api/upstreams/check') {
       const source = sources.find(s=>s.method===data.method)!
       const scenario = params.get('updates')
@@ -38,8 +41,8 @@ export function installPreview() {
     if (input.path === 'api/runs') return respond({runs:runs.map(summary)})
     if (input.path === 'api/runs/start') {
       const selected = methods.methods.find(m=>m.method===data.method)!
-      const r=example(`1-${Date.now()}`,selected.tiers.find(t=>t.id===data.tier)!.count)
-      Object.assign(r,{account_id:data.account_id,account_name:data.account_id==='demo-b'?'备用账号 B':'主账号 A · 固定代理',created_at:Date.now(),updated_at:Date.now(),status:'ready',attempts:[],report:data.method==='modeltrace'?traceReport(0):report(0,r.plan.jobs.length)})
+      const r=example(`1-${++sequence}`,selected.tiers.find(t=>t.id===data.tier)!.count)
+      Object.assign(r,{account_id:data.account_id,account_name:accounts.find(a=>a.id===data.account_id)?.name || data.account_id,created_at:Date.now(),updated_at:Date.now(),status:'ready',attempts:[],report:data.method==='modeltrace'?traceReport(0):report(0,r.plan.jobs.length)})
       Object.assign(r.plan,{method:data.method,engine_version:selected.engine_version,id:selected.id,hash:selected.hash,version:selected.version,tier:data.tier,claimed_model:data.claimed_model,request_model:data.request_model})
       runs.unshift(r);return respond({run:r})
     }

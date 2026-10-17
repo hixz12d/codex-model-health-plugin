@@ -1,5 +1,6 @@
 pub mod domain;
 pub mod engine;
+mod execution;
 mod host;
 mod management;
 mod updates;
@@ -15,13 +16,15 @@ pub(crate) struct Service {
     engine: engine::Engine,
     state: Mutex<()>,
     execution: Semaphore,
+    accounts: execution::Accounts,
     updates: updates::UpdateChecker,
 }
 pub fn plugin(engine: engine::Engine) -> Result<ComposedPlugin, AuthorError> {
     let service = Arc::new(Service {
         engine,
         state: Mutex::new(()),
-        execution: Semaphore::new(1),
+        execution: Semaphore::new(4),
+        accounts: execution::Accounts::default(),
         updates: updates::UpdateChecker::default(),
     });
     PluginBuilder::from_json(include_bytes!("../../plugin.json"))?

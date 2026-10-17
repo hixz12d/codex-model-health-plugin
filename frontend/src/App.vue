@@ -16,8 +16,9 @@ const bootstrap = ref<Bootstrap | null>(null), history = ref<History[]>([]), run
 const loading = ref(true), error = ref(''), action = ref(false), pumping = ref(false), modelsLoading = ref(false), starting = ref(false)
 const account = ref(''), key = ref(''), model = ref(''), claimed = ref(''), tier = ref('low'), models = ref<string[]>([])
 const selectionMode = ref('single'), selectedAccounts = ref<string[]>([])
+const parallel = ref('3')
 const batch = useBatchDetection({ onRun: value => { if (run.value?.id === value.id) run.value = value }, reload: loadHistory })
-const { rows: batchRows, running: batchRunning, remaining: batchRemaining, completed: batchCompleted, issues: batchIssues, error: batchError, params: batchParams } = batch
+const { rows: batchRows, running: batchRunning, active: batchActive, concurrency: batchConcurrency, paused: batchPaused, canPause: batchCanPause, remaining: batchRemaining, completed: batchCompleted, issues: batchIssues, error: batchError, params: batchParams } = batch
 const busy = computed(() => pumping.value || batchRunning.value)
 const formLocked = computed(() => busy.value || action.value || batchRemaining.value > 0)
 const batchAccounts = computed(() => (bootstrap.value?.accounts ?? []).filter(a => selectedAccounts.value.includes(a.id)))
@@ -31,7 +32,7 @@ const methodOptions = computed(() => bootstrap.value?.catalog.methods.map(c => (
 watch(method, value => { tier.value = value === 'modeltrace' ? 'fixed' : 'low'; claimed.value = value === 'modeltrace' ? 'unified' : '' })
 const reportView = ref('fingerprint')
 const detailsOpen = ref(false), reportSection = ref<HTMLElement | null>(null)
-const currentRunBusy = computed(() => pumping.value || (batchRunning.value && batchRows.value.some(row => row.status === 'running' && row.run?.id === run.value?.id)))
+const currentRunBusy = computed(() => pumping.value || batchRows.value.some(row => (row.status === 'running' || row.status === 'pausing') && row.run?.id === run.value?.id))
 let reportTrigger: HTMLElement | null = null
 function revealReport() {
   reportTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -97,7 +98,7 @@ async function start() {
   if (selectionMode.value === 'batch') {
     detailsOpen.value = false
     run.value = null
-    batch.start(batchAccounts.value, {method:method.value,key_id:key.value,request_model:model.value,claimed_model:claimed.value,tier:tier.value})
+    batch.start(batchAccounts.value, {method:method.value,key_id:key.value,request_model:model.value,claimed_model:claimed.value,tier:tier.value}, Number(parallel.value))
     return
   }
   starting.value = true
@@ -150,14 +151,15 @@ onScopeDispose(() => { disposed=true;keepRunning=false;document.removeEventListe
             <div class="field"><label id="model-label">请求模型</label><BaseSelect v-model="model" aria-labelledby="model-label" :options="models.map(m=>({value:m,label:m}))" :loading="modelsLoading" :disabled="!key || formLocked" placeholder="先选择计量 Key" filterable /></div>
             <div class="field"><label id="claimed-label">对照基线</label><BaseSelect v-if="method === 'meow'" v-model="claimed" aria-labelledby="claimed-label" :options="catalog?.models.map(m=>({value:m.id,label:m.label || m.id})) ?? []" :disabled="loading || formLocked" placeholder="选择要核对的模型" /><BaseSelect v-else model-value="unified" aria-labelledby="claimed-label" :options="[{value:'unified',label:`统一候选库 · ${catalog?.models.length ?? 0} 个模型`}]" disabled /></div>
             <div v-if="method === 'meow'" class="field"><label id="tier-label">检测档位</label><BaseSegmented v-model="tier" aria-labelledby="tier-label" label="检测档位" :options="tierOptions" :disabled="formLocked" /></div>
-            <p v-else class="col-span-full muted text-cp-sm m-0">三轮独立数字选择 · 同时比较 GPT / Claude 家族候选</p>
+            <div v-if="selectionMode === 'batch'" class="field col-span-full"><label id="parallel-label">同时检测账号数</label><BaseSegmented v-model="parallel" aria-labelledby="parallel-label" label="同时检测账号数" :options="[{value:'1',label:'1 个'},{value:'2',label:'2 个'},{value:'3',label:'3 个'},{value:'4',label:'4 个'}]" :disabled="loading || formLocked" /><p class="muted text-cp-xs m-0">账号之间并行，同一账号内逐题执行；可单独暂停，暂停后等当前题完成再释放名额。并发越高，单位时间用量越大。</p></div>
+            <p v-if="method === 'modeltrace'" class="col-span-full muted text-cp-sm m-0">三轮独立数字选择 · 同时比较 GPT / Claude 家族候选</p>
           </div>
-          <div class="start-row"><p class="muted text-cp-xs"><template v-if="selectionMode === 'batch'">{{ batchAccounts.length }} 个账号 × {{ count }} 个样本 · 最多 {{ batchAccounts.length * (count + Math.ceil(count/2)) }} 次请求（含手动重试）<br>逐个账号执行；隐藏页面后暂停，返回时需手动继续。</template><template v-else>{{ count }} 个样本 · 最多 {{ count + Math.ceil(count/2) }} 次请求（含重试）</template><br>真实调用会计入所选 Key 的用量。</p><BaseButton variant="primary" :disabled="!canStart" :loading="starting" @click="start"><Play class="size-4" />{{ selectionMode === 'batch' ? '开始批量检测' : '开始检测' }}</BaseButton></div>
+          <div class="start-row"><p class="muted text-cp-xs"><template v-if="selectionMode === 'batch'">{{ batchAccounts.length }} 个账号 × {{ count }} 个样本 · 最多 {{ batchAccounts.length * (count + Math.ceil(count/2)) }} 次请求（含手动重试）<br>最多同时 {{ parallel }} 个账号；隐藏页面后全部暂停，返回需手动继续。</template><template v-else>{{ count }} 个样本 · 最多 {{ count + Math.ceil(count/2) }} 次请求（含重试）</template><br>真实调用会计入所选 Key 的用量。</p><BaseButton variant="primary" :disabled="!canStart" :loading="starting" @click="start"><Play class="size-4" />{{ selectionMode === 'batch' ? '开始批量检测' : '开始检测' }}</BaseButton></div>
         </template>
       </BaseCard>
     </div>
 
-    <BatchResults :rows="batchRows" :running="batchRunning" :remaining="batchRemaining" :completed="batchCompleted" :issues="batchIssues" :error="batchError" :params="batchParams" :busy="pumping || action" @pause="batch.pause" @resume="batch.resume" @finish="batch.finish" @view="viewBatchRun" />
+    <BatchResults :rows="batchRows" :running="batchRunning" :active="batchActive" :concurrency="batchConcurrency" :paused="batchPaused" :can-pause="batchCanPause" :remaining="batchRemaining" :completed="batchCompleted" :issues="batchIssues" :error="batchError" :params="batchParams" :busy="pumping || action" @pause="batch.pause" @resume="batch.resume" @pause-account="batch.pauseAccount" @resume-account="batch.resumeAccount" @finish="batch.finish" @view="viewBatchRun" />
 
     <section v-if="run && detailsOpen" ref="reportSection" tabindex="-1" aria-label="账号检测详情">
     <BaseCard>

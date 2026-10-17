@@ -193,7 +193,8 @@ async fn dispatch(
         ("POST", "api/runs/get") => {
             let query: Identity = input(&call)?;
             let (run, _) = find(&call.host, &query.id).await?;
-            reply(json!({"run":run,"busy":service.execution.available_permits()==0}))
+            let busy = service.accounts.busy(&run.account_id);
+            reply(json!({"run":run,"busy":busy}))
         }
         ("POST", "api/runs/start") => start(service, &call.host, input(&call)?).await,
         ("POST", "api/runs/control") => control(service, &call.host, input(&call)?).await,
@@ -279,18 +280,13 @@ async fn control(
         return Err(invalid("未知的任务控制操作"));
     }
     // 只有明确续测才修复上次中断；并发中的真实请求仍持有执行租约。
-    let _execution = if query.action == "resume" {
-        Some(
-            service
-                .execution
-                .try_acquire()
-                .map_err(|_| invalid("当前题目尚在完成，请稍后刷新"))?,
-        )
+    let _lock = service.state.lock().await;
+    let (mut run, version) = find(host, &query.id).await?;
+    let _account = if query.action == "resume" {
+        Some(service.accounts.acquire(&run.account_id)?)
     } else {
         None
     };
-    let _lock = service.state.lock().await;
-    let (mut run, version) = find(host, &query.id).await?;
     if run.finished() {
         return Err(invalid("任务已结束，历史报告保持不变"));
     }
@@ -298,7 +294,7 @@ async fn control(
         "pause" => run.status = Status::Paused,
         "stop" => {
             run.status = Status::Stopped;
-            if service.execution.available_permits() > 0 && run.inflight.is_some() {
+            if !service.accounts.busy(&run.account_id) && run.inflight.is_some() {
                 run.recover()?;
                 run.status = Status::Stopped;
             }
@@ -322,10 +318,11 @@ async fn step(
     let _execution = service
         .execution
         .try_acquire()
-        .map_err(|_| invalid("另一个检测请求正在执行，请等待该题完成"))?;
-    let (snapshot, job, body) = {
+        .map_err(|_| invalid("已有 4 个账号正在检测，请等待空闲名额"))?;
+    let (snapshot, job, body, _account) = {
         let _lock = service.state.lock().await;
         let (mut run, version) = find(host, id).await?;
+        let account = service.accounts.acquire(&run.account_id)?;
         host::validate_account(host, &mut run).await?;
         let job = run.next_job().ok_or_else(|| invalid("检测计划已完成"))?;
         let body = service
@@ -336,7 +333,7 @@ async fn step(
         run.updated_at = now_ms();
         // 发送前写入 pending；进程或页面中断不会恢复成免费重试。
         host::write(host, &run, Some(version)).await?;
-        (run, job, body)
+        (run, job, body, account)
     };
     let result = match host::execute(host, &snapshot, body).await {
         Ok((request_id, sse)) => match service
